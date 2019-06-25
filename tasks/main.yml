@@ -1,1 +1,117 @@
-# role tasks
+- name: install ceph-ansible package
+  package:
+    name: ceph-ansible
+    state: present
+  become: true
+  become_user: "{{ prepare_ceph_adm_become_user }}"
+
+- name: ensure that install prefix exists
+  file:
+    path: "{{ prepare_ceph_adm_destination }}"
+    state: directory
+    owner: "{{ prepare_ceph_adm_target_user }}"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: create {{ prepare_ceph_adm_ceph_ansible_keys_dir }} directory
+  file:
+    path: "{{ prepare_ceph_adm_ceph_ansible_keys_dir }}"
+    state: directory
+    mode: 0700
+    owner: "{{ prepare_ceph_adm_target_user }}"
+    group: "{{ prepare_ceph_adm_target_user }}"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: >
+    create /etc/ansible/group_vars symlink to
+    /usr/share/ceph-ansible/group_vars
+  file:
+    path: /etc/ansible/group_vars
+    src: /usr/share/ceph-ansible/group_vars
+    state: link
+    owner: root
+    group: root
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: >
+    copy /usr/share/ceph-ansible/site.yml.sample to
+    /usr/share/ceph-ansible/site.yml
+  copy:
+    remote_src: true
+    src: /usr/share/ceph-ansible/site.yml.sample
+    dest: /usr/share/ceph-ansible/site.yml
+    owner: root
+    group: root
+    mode: 0644
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: copy local inventory file to system if it exists
+  copy:
+    src: "{{ prepare_ceph_adm_inventory_file }}"
+    dest: "{{ prepare_ceph_adm_destination }}/hosts"
+    owner: "{{ prepare_ceph_adm_target_user }}"
+    mode: 0644
+  when: prepare_ceph_adm_inventory_file is is_file
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: create group_var directory
+  file:
+    path: "{{ prepare_ceph_adm_destination }}/group_vars"
+    state: directory
+    owner: "{{ prepare_ceph_adm_target_user }}"
+    mode: 0755
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: copy local files/group_vars/* to remote system if they exist
+  copy:
+    src: "{{ item }}"
+    dest: "{{ prepare_ceph_adm_destination }}/group_vars"
+    owner: "{{ prepare_ceph_adm_target_user }}"
+    mode: 0644
+  with_fileglob:
+    - "{{ prepare_ceph_adm_group_vars_dir }}/*"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: configure remote ansible.cfg
+  ini_file:
+    path: "{{ prepare_ceph_adm_destination }}/ansible.cfg"
+    section: defaults
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+  with_dict: "{{ prepare_ceph_adm_ansible_cfg }}"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: create remote log directory
+  file:
+    path: "{{ prepare_ceph_adm_ansible_cfg.log_path | dirname }}"
+    state: directory
+    mode: 0755
+    owner: "{{ prepare_ceph_adm_target_user }}"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: configure /usr/share/ceph-ansible/ansible.cfg
+  ini_file:
+    path: /usr/share/ceph-ansible/ansible.cfg
+    section: defaults
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+  with_dict: "{{ prepare_ceph_adm_ansible_cfg }}"
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
+
+- name: copy local SSH key to remote control machine
+  copy:
+    src: "{{ prepare_ceph_adm_ssh_private_key_file }}"
+    dest: "{{ prepare_ceph_adm_ansible_cfg.private_key_file }}"
+    owner: "{{ prepare_ceph_adm_target_user }}"
+    mode: 0600
+  become: "{{ prepare_ceph_adm_target_user != ansible_user }}"
+  become_user: "{{ prepare_ceph_adm_target_user }}"
